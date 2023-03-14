@@ -1,4 +1,5 @@
 from typing import Tuple
+import json
 import requests
 import random
 import multiprocessing as mp
@@ -21,26 +22,33 @@ def get_answer(x) -> Tuple[str,str]:
     true_lon = parsed_html.find('input', attrs={'id': 'nmea_lon'})['value']
     return true_lat, true_lon
 
-def verify(num_times: int):
-    """Testing with the website. Only used for validation."""
+def verify(num_times: int, fname: str = None):
+    """Testing with the website. Only used for validation.
+    num_times: how many examples to generate and testing
+    fname: filename for previously saved json file
+    """
 
-    examples = [(66.882115,-76.039129), (25.092267,125.987818),(56.166042,-176.45725)]  # good examples for testing padding
-    for _ in range(num_times):
-        # rescaling from [0,1] to proper ranges -- [-90,90] for lat, [-180,180] for lon
-        lat = round(random.random() * 180 - 90, 6)
-        lon = round(random.random() * 360 - 180, 6)
-        examples.append((lat, lon))
+    if fname:
+        with open(fname, 'r') as f:
+            examples = json.load(f)
+        examples, true_answers = examples['examples'], examples['answers']
+    else:
+        examples = [(66.882115,-76.039129), (25.092267,125.987818),(56.166042,-176.45725)]  # good examples for testing padding
+        for _ in range(num_times):
+            # rescaling from [0,1] to proper ranges -- [-90,90] for lat, [-180,180] for lon
+            lat = round(random.random() * 180 - 90, 6)
+            lon = round(random.random() * 360 - 180, 6)
+            examples.append((lat, lon))
 
-    with mp.Pool(processes=2) as pool:
-        with tqdm(total=len(examples)) as pbar:
-            true_answers = []
-            for x in pool.imap(get_answer, examples):
-                true_answers.append(x)
-                pbar.update()
+        with mp.Pool(processes=2) as pool:
+            with tqdm(total=len(examples)) as pbar:
+                true_answers = []
+                for x in pool.imap(get_answer, examples):
+                    true_answers.append(x)
+                    pbar.update()
 
-    import json
-    with open('examples2.json', 'w', encoding='utf-8') as f:
-        json.dump({'examples': examples, 'answers': true_answers}, f)
+        with open('examples2.json', 'w', encoding='utf-8') as f:
+            json.dump({'examples': examples, 'answers': true_answers}, f)
 
     for (lat, lon), (true_lat, true_lon) in tqdm(zip(examples, true_answers)):
         current_lat, current_lon = deg2ddm(lat, lon)
@@ -49,4 +57,4 @@ def verify(num_times: int):
     print('Everything ok!')
 
 if __name__ == "__main__":
-    verify(100)
+    verify(100, 'examples.json')
